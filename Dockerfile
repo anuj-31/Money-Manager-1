@@ -1,11 +1,9 @@
 
-
-# ---------- RUN STAGE ----------
 FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY target/*.jar moneymanager-v1.0.jar
+COPY ./target/*.jar moneymanager-v1.0.jar
 
 EXPOSE 9090
 
