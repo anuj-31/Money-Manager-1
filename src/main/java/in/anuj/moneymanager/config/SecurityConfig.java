@@ -42,7 +42,8 @@ public class SecurityConfig {
                                 "/health",
                                 "/register",
                                 "/activate",
-                                "/login"
+                                "/login",
+                                "/profile/image/file/**"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session ->

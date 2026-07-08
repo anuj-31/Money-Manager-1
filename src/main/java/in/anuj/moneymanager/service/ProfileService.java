@@ -30,7 +30,15 @@ public class ProfileService {
     private   String activationURL;
 
     public ProfileDto registerProfile(ProfileDto profileDTO) {
+        String normalizedEmail = normalizeEmail(profileDTO.getEmail());
+        profileDTO.setEmail(normalizedEmail);
+
+        if (profileRepository.existsByEmail(normalizedEmail)) {
+            throw new RuntimeException("Email is already registered");
+        }
+
         ProfileEntity newProfile = toEntity(profileDTO);
+        newProfile.setIsActive(true);
         newProfile.setActivationToken(UUID.randomUUID().toString());
         newProfile = profileRepository.save(newProfile);
         //send activation email
@@ -75,14 +83,14 @@ public class ProfileService {
     }
     //
     public boolean isAccountActive(String email) {
-        return profileRepository.findByEmail(email)
+        return profileRepository.findFirstByEmailOrderByIdDesc(normalizeEmail(email))
                 .map(ProfileEntity::getIsActive)
                 .orElse(false);
     }
 
     public ProfileEntity getCurrentProfile() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return profileRepository.findByEmail(authentication.getName())
+        return profileRepository.findFirstByEmailOrderByIdDesc(normalizeEmail(authentication.getName()))
                 .orElseThrow(() -> new UsernameNotFoundException("Profile not found with email: " + authentication.getName()));
     }
     //
@@ -91,7 +99,7 @@ public class ProfileService {
         if (email == null) {
             currentUser = getCurrentProfile();
         }else {
-            currentUser = profileRepository.findByEmail(email)
+            currentUser = profileRepository.findFirstByEmailOrderByIdDesc(normalizeEmail(email))
                     .orElseThrow(() -> new UsernameNotFoundException("Profile not found with email: " + email));
         }
 
@@ -105,19 +113,30 @@ public class ProfileService {
                 .build();
     }
 
+    public ProfileDto updateProfileImage(String profileImageUrl) {
+        ProfileEntity currentUser = getCurrentProfile();
+        currentUser.setProfileImageUrl(profileImageUrl);
+        return toDTO(profileRepository.save(currentUser));
+    }
+
 
 
     public Map<String, Object> authenticateAndGenerateToken(AuthDTO authDTO) {
         try {
-            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(authDTO.getEmail(), authDTO.getPassword()));
+            String normalizedEmail = normalizeEmail(authDTO.getEmail());
+            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(normalizedEmail, authDTO.getPassword()));
             //Generate JWT token
-            String token = jwtUtil.generateToken(authDTO.getEmail());
+            String token = jwtUtil.generateToken(normalizedEmail);
             return Map.of(
                     "token", token,
-                    "user", getPublicProfile(authDTO.getEmail())
+                    "user", getPublicProfile(normalizedEmail)
             );
         } catch (Exception e) {
             throw new RuntimeException("Invalid email or password");
         }
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
     }
 }
